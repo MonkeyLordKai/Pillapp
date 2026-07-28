@@ -190,6 +190,48 @@ body {
 /* Status + controls                                           */
 /* ---------------------------------------------------------- */
 
+.pill-slot.pending {
+  animation: pill-pulse 0.6s ease-in-out infinite;
+  cursor: wait;
+}
+
+@keyframes pill-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* ---------------------------------------------------------- */
+/* Actions                                                      */
+/* ---------------------------------------------------------- */
+
+.actions-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.new-pack-btn {
+  background: white;
+  color: var(--pink-header-dark);
+  border: 1.5px solid var(--pink-card-border);
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(255, 95, 162, 0.15);
+  transition: transform 0.15s ease;
+}
+
+.new-pack-btn:active {
+  transform: scale(0.96);
+}
+
+.new-pack-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 .status-line {
   text-align: center;
   font-weight: 600;
