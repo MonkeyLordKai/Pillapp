@@ -1,66 +1,199 @@
 /* ============================================================
-   Starter styling only — replace this with your real pink/cute
-   design. Kept minimal on purpose so it doesn't fight your vision.
+   Pill Tracker — pink & cute UI, matched to the Figma design.
    ============================================================ */
+
+:root {
+  --pink-header: #ff5fa2;
+  --pink-header-dark: #ff4394;
+  --pink-page: #fff2f8;
+  --pink-card: #ffcbe6;
+  --pink-card-border: #ffb7da;
+  --pill-gray: #8b8b93;
+  --pill-white: #ffffff;
+  --text-dark: #4a2b3a;
+  --shadow: 0 12px 30px rgba(255, 95, 162, 0.18);
+}
+
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
-  font-family: -apple-system, system-ui, sans-serif;
-  background: #ffe6f0;
-  color: #4a2b3a;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: var(--pink-page);
+  color: var(--text-dark);
   padding-bottom: 40px;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* ---------------------------------------------------------- */
+/* Header                                                      */
+/* ---------------------------------------------------------- */
 
 .app-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px;
-  background: #ff8fb1;
+  padding: 18px 20px;
+  background: linear-gradient(135deg, var(--pink-header), var(--pink-header-dark));
   color: white;
+  border-radius: 0 0 20px 20px;
+  box-shadow: var(--shadow);
 }
 
-.app-header h1 {
-  font-size: 20px;
-  margin: 0;
-}
-
-#enable-notifs {
-  background: white;
-  color: #ff8fb1;
-  border: none;
-  border-radius: 20px;
-  padding: 8px 14px;
-  font-weight: 600;
-}
-
-.pillbox {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
+.app-header__title {
+  display: flex;
+  align-items: center;
   gap: 10px;
-  padding: 20px;
-  max-width: 500px;
-  margin: 0 auto;
 }
 
-.pill-slot {
-  aspect-ratio: 1;
-  border-radius: 50%;
-  border: 2px solid #ff8fb1;
-  background: white;
-  font-size: 20px;
+.pill-icon {
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.pill-slot.taken {
-  background: #ffd1e0;
-  border-color: #ffb6c9;
-  opacity: 0.6;
+.pill-icon svg {
+  width: 24px;
+  height: 24px;
 }
+
+.app-header h1 {
+  font-size: 21px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: 0.2px;
+}
+
+.bell-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: transform 0.15s ease;
+  padding: 0;
+}
+
+.bell-btn:active {
+  transform: scale(0.92);
+}
+
+.bell-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.bell-icon--off {
+  display: none;
+}
+
+.bell-btn.muted {
+  background: var(--pink-card);
+}
+
+.bell-btn.muted .bell-icon--on {
+  display: none;
+}
+
+.bell-btn.muted .bell-icon--off {
+  display: block;
+}
+
+/* ---------------------------------------------------------- */
+/* Pillbox card                                                */
+/* ---------------------------------------------------------- */
+
+.pillbox-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 32px 20px 8px;
+}
+
+.pillbox {
+  --columns: 4;
+  display: grid;
+  grid-template-columns: repeat(var(--columns), 1fr);
+  gap: 18px 16px;
+  background: var(--pink-card);
+  border: 1px solid var(--pink-card-border);
+  border-radius: 28px;
+  padding: 28px 22px;
+  max-width: 360px;
+  width: 100%;
+  box-shadow: var(--shadow);
+  position: relative;
+}
+
+/* thin vertical dividers between columns, like a blister pack */
+.pillbox::before {
+  content: "";
+  position: absolute;
+  inset: 20px 22px;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent,
+    transparent calc((100% / var(--columns)) - 1px),
+    rgba(255, 255, 255, 0.55) calc((100% / var(--columns)) - 1px),
+    rgba(255, 255, 255, 0.55) calc(100% / var(--columns))
+  );
+  pointer-events: none;
+  border-radius: 12px;
+}
+
+.pill-slot {
+  position: relative;
+  z-index: 1;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease, opacity 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08), inset 0 -2px 3px rgba(0, 0, 0, 0.06);
+}
+
+.pill-slot:active {
+  transform: scale(0.9);
+}
+
+.pill-slot--gray {
+  background: var(--pill-gray);
+}
+
+.pill-slot--white {
+  background: var(--pill-white);
+}
+
+/* Taken = the pill has been "popped out" of the pack, so the
+   slot goes see-through and shows the card color behind it. */
+.pill-slot.taken {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+  opacity: 0.55;
+}
+
+.pill-slot--gray.taken,
+.pill-slot--white.taken {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------- */
+/* Status + controls                                           */
+/* ---------------------------------------------------------- */
 
 .status-line {
   text-align: center;
   font-weight: 600;
+  color: var(--pink-header-dark);
+  margin-top: 20px;
+  font-size: 15px;
 }
