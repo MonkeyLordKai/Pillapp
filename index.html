@@ -4,34 +4,54 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Pill Tracker</title>
-
+ 
 <!-- PWA install support -->
 <link rel="manifest" href="./manifest.json" />
-
+ 
 <!-- iOS "Add to Home Screen" specific tags -->
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Pills" />
 <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-
+ 
 <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-
+ 
 <header class="app-header">
-  <h1>💊 Pill Tracker</h1>
-  <button id="enable-notifs">Enable Notifications</button>
+  <div class="app-header__title">
+    <span class="pill-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4.93 19.07a5 5 0 0 0 7.07 0l7.07-7.07a5 5 0 0 0-7.07-7.07l-7.07 7.07a5 5 0 0 0 0 7.07Z" stroke="white" stroke-width="1.8"/>
+        <path d="M8.46 8.46 15.54 15.54" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+    </span>
+    <h1>Pill tracker</h1>
+  </div>
+  <button id="enable-notifs" class="bell-btn" aria-label="Enable notifications">
+    <svg class="bell-icon bell-icon--on" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 3a5 5 0 0 0-5 5v2.7c0 .56-.2 1.1-.57 1.53L5 14.5A1.5 1.5 0 0 0 6.15 17h11.7A1.5 1.5 0 0 0 19 14.5l-1.43-2.27A2.5 2.5 0 0 1 17 10.7V8a5 5 0 0 0-5-5Z" stroke="#ff5fa2" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M9.5 17a2.5 2.5 0 0 0 5 0" stroke="#ff5fa2" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>
+    <svg class="bell-icon bell-icon--off" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 3a5 5 0 0 0-5 5v2.7c0 .56-.2 1.1-.57 1.53L5 14.5A1.5 1.5 0 0 0 6.15 17h11.7A1.5 1.5 0 0 0 19 14.5l-1.43-2.27A2.5 2.5 0 0 1 17 10.7V8a5 5 0 0 0-5-5Z" stroke="#ff5fa2" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M9.5 17a2.5 2.5 0 0 0 5 0" stroke="#ff5fa2" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M4 20 20 4" stroke="#ff5fa2" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>
+  </button>
 </header>
-
+ 
 <!-- This is where the pillbox UI renders. Style/rebuild this freely —
      just keep the data-slot-index attribute and the take/undo click
      handlers wired to window.PillTracker so the logic keeps working. -->
-<main id="pillbox" class="pillbox">
-  <!-- filled in by renderPillbox() -->
+<main class="pillbox-wrap">
+  <div id="pillbox" class="pillbox">
+    <!-- filled in by renderPillbox() -->
+  </div>
 </main>
-
+ 
 <p class="status-line" id="status-line"></p>
-
+ 
 <script type="module" src="./app.js"></script>
 <script>
   // --------------------------------------------------------
@@ -39,25 +59,33 @@
   // This is intentionally basic; it exists so the app works
   // end-to-end while you build the real pink/cute UI.
   // --------------------------------------------------------
+  const COLUMNS = 4; // matches the blister-pack layout in the design
+ 
   window.renderPillbox = function (slots, { me, takePill, undoPill }) {
     const container = document.getElementById("pillbox");
     container.innerHTML = "";
-
+    container.style.setProperty("--columns", COLUMNS);
+ 
     const remaining = slots.filter((s) => !s.taken).length;
     document.getElementById("status-line").textContent =
       `${remaining} of ${slots.length} pills remaining`;
-
+ 
     slots.forEach((slot, i) => {
+      const col = i % COLUMNS;
       const el = document.createElement("button");
-      el.className = "pill-slot" + (slot.taken ? " taken" : "");
+ 
+      // First column reads as the "gray" pills, the rest as "white" —
+      // this is purely visual (matches the pack mockup) and has no
+      // effect on the take/undo logic.
+      const shade = col === 0 ? "pill-slot--gray" : "pill-slot--white";
+      el.className = `pill-slot ${shade}` + (slot.taken ? " taken" : "");
       el.dataset.slotIndex = i;
-      el.textContent = slot.taken ? "✓" : "💊";
-
+ 
       if (slot.taken && slot.takenAt) {
         const when = new Date(slot.takenAt).toLocaleString();
         el.title = `Taken by ${slot.takenBy} at ${when}`;
       }
-
+ 
       el.addEventListener("click", async () => {
         if (!slot.taken) {
           const result = await takePill(i);
@@ -65,19 +93,37 @@
             alert("Someone just logged this one a second ago — refreshing.");
           }
         } else {
-          if (confirm(`Undo this log by ${slot.takenBy}?`)) {
+          const when = slot.takenAt ? new Date(slot.takenAt).toLocaleString() : "";
+          if (confirm(`Undo this log by ${slot.takenBy}${when ? ` (${when})` : ""}?`)) {
             await undoPill(i);
           }
         }
       });
-
+ 
       container.appendChild(el);
     });
   };
-
-  document.getElementById("enable-notifs").addEventListener("click", () => {
-    // Must be triggered by a user tap (especially required on iOS)
-    window.PillTracker.registerForPush();
+ 
+  const bellBtn = document.getElementById("enable-notifs");
+ 
+  // Reflect any saved mute preference on load.
+  if (localStorage.getItem("pt_muted") === "true") {
+    bellBtn.classList.add("muted");
+    bellBtn.setAttribute("aria-label", "Notifications muted — tap to unmute");
+  }
+ 
+  bellBtn.addEventListener("click", async () => {
+    const isMuted = bellBtn.classList.toggle("muted");
+    localStorage.setItem("pt_muted", isMuted);
+    bellBtn.setAttribute(
+      "aria-label",
+      isMuted ? "Notifications muted — tap to unmute" : "Enable notifications"
+    );
+ 
+    if (!isMuted) {
+      // Must be triggered by a user tap (especially required on iOS)
+      window.PillTracker.registerForPush();
+    }
   });
 </script>
 </body>
