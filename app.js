@@ -17,6 +17,7 @@ import {
   onSnapshot,
   runTransaction,
   setDoc,
+  deleteDoc,
   serverTimestamp,
   collection,
   addDoc,
@@ -33,18 +34,40 @@ const db = getFirestore(app);
 const TOTAL_PILLS = 28; // e.g. a 28-day pack. Change to whatever her case holds.
 
 // ------------------------------------------------------------
-// IDENTITY: "who am I" (her or you), and the shared household code
+// IDENTITY: just a shared household code (no names/logins).
+//
+// We don't ask who you are anymore — the UI only shows taken/
+// not-taken + the date/time, never a person's name. Internally
+// each device still gets a random, invisible ID (auto-generated,
+// nothing to type) used only to (a) avoid notifying yourself and
+// (b) know which push subscription belongs to which device.
+//
+// The household code is the one thing that still has to match on
+// both phones. iOS can occasionally clear localStorage after a
+// week of the app being unused (Intelligent Tracking Prevention),
+// which used to look like "it forgot my code". To survive that,
+// the code can also travel in the URL (?household=...), and the
+// app shows a one-tap "copy your saved link" box below once it's
+// set — see the panel that appears after you enter your code.
 // ------------------------------------------------------------
-function getOrAskName() {
-  let name = localStorage.getItem("pt_name");
-  if (!name) {
-    name = prompt("What's your name? (so logs show who took/logged the pill)");
-    localStorage.setItem("pt_name", name || "Someone");
+const urlParams = new URLSearchParams(window.location.search);
+
+function getOrCreateDeviceId() {
+  let id = localStorage.getItem("pt_device_id");
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+    localStorage.setItem("pt_device_id", id);
   }
-  return name;
+  return id;
 }
 
 function getOrAskHouseholdCode() {
+  const fromUrl = urlParams.get("household");
+  if (fromUrl) {
+    localStorage.setItem("pt_household", fromUrl);
+    return fromUrl;
+  }
+
   let code = localStorage.getItem("pt_household");
   if (!code) {
     code = prompt(
@@ -55,7 +78,7 @@ function getOrAskHouseholdCode() {
   return code;
 }
 
-const ME = getOrAskName();
+const ME = getOrCreateDeviceId();
 const HOUSEHOLD = getOrAskHouseholdCode();
 const householdRef = doc(db, "households", HOUSEHOLD);
 
@@ -122,7 +145,7 @@ async function takePill(slotIndex) {
     });
 
     // Fire a push notification to the other person (see notifications.js)
-    notifyOtherPerson(`${ME} logged a pill 💊`, `Taken at ${new Date().toLocaleTimeString()}`);
+    notifyOtherPerson(`Pill logged 💊`, `Taken at ${new Date().toLocaleTimeString()}`);
     return { ok: true };
   } catch (err) {
     if (err.message === "ALREADY_TAKEN") {
@@ -154,7 +177,22 @@ async function undoPill(slotIndex) {
     tx.update(householdRef, { slots });
   });
 
-  notifyOtherPerson(`${ME} undid a pill log`, `Slot ${slotIndex + 1} is available again`);
+  notifyOtherPerson(`Pill log undone`, `Slot ${slotIndex + 1} is available again`);
+}
+
+// ------------------------------------------------------------
+// NEW PACK — resets every slot back to untaken. Use this once
+// a pack/case is finished and you're starting a fresh one.
+// ------------------------------------------------------------
+async function resetPack() {
+  const slots = Array.from({ length: TOTAL_PILLS }, (_, i) => ({
+    index: i,
+    taken: false,
+    takenBy: null,
+    takenAt: null,
+  }));
+  await setDoc(householdRef, { slots, totalPills: TOTAL_PILLS });
+  notifyOtherPerson(`New pack started 💊`, `All ${TOTAL_PILLS} pills are back online`);
 }
 
 // ------------------------------------------------------------
@@ -163,14 +201,28 @@ async function undoPill(slotIndex) {
 // device can find it and send to it.
 // ------------------------------------------------------------
 async function registerForPush() {
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true;
+
+  // iOS only exposes PushManager/Notification permission inside an
+  // installed (Add to Home Screen) app, opened from its own icon —
+  // never inside a regular Safari tab. Detect this specifically so
+  // the UI can tell the person what to do, instead of failing silently.
+  if (isIOS && !isStandalone) {
+    return { ok: false, reason: "ios-not-installed" };
+  }
+
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-    console.warn("Push not supported on this browser/device.");
-    return;
+    return { ok: false, reason: "unsupported" };
   }
 
   const reg = await navigator.serviceWorker.register("./service-worker.js");
   const permission = await Notification.requestPermission();
-  if (permission !== "granted") return;
+  if (permission !== "granted") {
+    return { ok: false, reason: "permission-denied" };
+  }
 
   const sub = await reg.pushManager.subscribe({
     userVisibleOnly: true,
@@ -183,6 +235,8 @@ async function registerForPush() {
     subscription: sub.toJSON(),
     updatedAt: serverTimestamp(),
   });
+
+  return { ok: true };
 }
 
 function urlBase64ToUint8Array(base64String) {
@@ -190,6 +244,27 @@ function urlBase64ToUint8Array(base64String) {
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = atob(base64);
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+// ------------------------------------------------------------
+// UNSUBSCRIBE this device from push (used when muting). Removes
+// the browser-level subscription AND the Firestore record so the
+// other person's device stops trying to send to it.
+// ------------------------------------------------------------
+async function unregisterPush() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration("./service-worker.js");
+    const sub = reg && (await reg.pushManager.getSubscription());
+    if (sub) await sub.unsubscribe();
+  } catch (err) {
+    console.warn("Failed to unsubscribe push:", err);
+  }
+  try {
+    await deleteDoc(doc(db, "households", HOUSEHOLD, "subscriptions", ME));
+  } catch (err) {
+    console.warn("Failed to remove subscription doc:", err);
+  }
 }
 
 // ------------------------------------------------------------
@@ -225,8 +300,16 @@ window.PillTracker = {
   listenForChanges,
   takePill,
   undoPill,
+  resetPack,
   registerForPush,
+  unregisterPush,
 };
+
+// Let the classic (non-module) script in index.html know it's safe
+// to read window.PillTracker now — module scripts run after the
+// page has parsed, so anything relying on this can't just run
+// top-level in that script; it has to wait for this event.
+window.dispatchEvent(new CustomEvent("pilltracker-ready"));
 
 // ------------------------------------------------------------
 // BOOT
