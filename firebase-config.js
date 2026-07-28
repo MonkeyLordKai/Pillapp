@@ -8,4 +8,4 @@ export const firebaseConfig = {
   appId: "1:187367370264:web:32e173df1aecb30de6dd6d",
 };
  
-export const VAPID_PUBLIC_KEY = "REPLACE_ME_WITH_YOUR_VAPID_PUBLIC_KEY";
+export const VAPID_PUBLIC_KEY = "BDrHzKYj0IoEwUT3Tzn7wJnLhTdAgEP7r10SYBmMdbIpjZG8rrZl0aoG7UdjTv8_fsWHrSg2jyoSw9EDPR2jbQ4";
