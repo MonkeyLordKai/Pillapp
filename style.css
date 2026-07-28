@@ -1,0 +1,66 @@
+/* ============================================================
+   Starter styling only — replace this with your real pink/cute
+   design. Kept minimal on purpose so it doesn't fight your vision.
+   ============================================================ */
+
+body {
+  margin: 0;
+  font-family: -apple-system, system-ui, sans-serif;
+  background: #ffe6f0;
+  color: #4a2b3a;
+  padding-bottom: 40px;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #ff8fb1;
+  color: white;
+}
+
+.app-header h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+#enable-notifs {
+  background: white;
+  color: #ff8fb1;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-weight: 600;
+}
+
+.pillbox {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  padding: 20px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.pill-slot {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid #ff8fb1;
+  background: white;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pill-slot.taken {
+  background: #ffd1e0;
+  border-color: #ffb6c9;
+  opacity: 0.6;
+}
+
+.status-line {
+  text-align: center;
+  font-weight: 600;
+}
