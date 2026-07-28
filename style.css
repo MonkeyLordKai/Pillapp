@@ -1,329 +1,310 @@
-// ============================================================
-// PILL TRACKER — app.js
-// This file is the "brain". It talks to Firestore for data +
-// sync, handles the take/undo logic with race-condition
-// protection, and fires push notifications to the other person.
-//
-// Your job (per the request) is styling: pill-tracker.css and
-// the markup/rendering inside renderPillbox(). The DATA and
-// SYNC logic below is complete and functional once you fill in
-// firebase-config.js with your own project's keys (see README).
-// ============================================================
+/* ============================================================
+   Pill Tracker — pink & cute UI, matched to the Figma design.
+   ============================================================ */
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {
-  getFirestore,
-  doc,
-  onSnapshot,
-  runTransaction,
-  setDoc,
-  deleteDoc,
-  serverTimestamp,
-  collection,
-  addDoc,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-import { firebaseConfig, VAPID_PUBLIC_KEY } from "./firebase-config.js";
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-// ------------------------------------------------------------
-// CONFIG YOU CAN CHANGE
-// ------------------------------------------------------------
-const TOTAL_PILLS = 28; // e.g. a 28-day pack. Change to whatever her case holds.
-
-// ------------------------------------------------------------
-// IDENTITY: just a shared household code (no names/logins).
-//
-// We don't ask who you are anymore — the UI only shows taken/
-// not-taken + the date/time, never a person's name. Internally
-// each device still gets a random, invisible ID (auto-generated,
-// nothing to type) used only to (a) avoid notifying yourself and
-// (b) know which push subscription belongs to which device.
-//
-// The household code is the one thing that still has to match on
-// both phones. iOS can occasionally clear localStorage after a
-// week of the app being unused (Intelligent Tracking Prevention),
-// which used to look like "it forgot my code". To survive that,
-// the code can also travel in the URL (?household=...), and the
-// app shows a one-tap "copy your saved link" box below once it's
-// set — see the panel that appears after you enter your code.
-// ------------------------------------------------------------
-const urlParams = new URLSearchParams(window.location.search);
-
-function getOrCreateDeviceId() {
-  let id = localStorage.getItem("pt_device_id");
-  if (!id) {
-    id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
-    localStorage.setItem("pt_device_id", id);
-  }
-  return id;
+:root {
+  --pink-header: #ff5fa2;
+  --pink-header-dark: #ff4394;
+  --pink-page: #fff2f8;
+  --pink-card: #ffcbe6;
+  --pink-card-border: #ffb7da;
+  --pill-gray: #8b8b93;
+  --pill-white: #ffffff;
+  --text-dark: #4a2b3a;
+  --shadow: 0 12px 30px rgba(255, 95, 162, 0.18);
 }
 
-function getOrAskHouseholdCode() {
-  const fromUrl = urlParams.get("household");
-  if (fromUrl) {
-    localStorage.setItem("pt_household", fromUrl);
-    return fromUrl;
-  }
-
-  let code = localStorage.getItem("pt_household");
-  if (!code) {
-    code = prompt(
-      "Enter your shared household code (make one up, e.g. 'pill-abc123'). Use the exact same code on both phones."
-    );
-    localStorage.setItem("pt_household", code);
-  }
-  return code;
+* {
+  box-sizing: border-box;
 }
 
-const ME = getOrCreateDeviceId();
-const HOUSEHOLD = getOrAskHouseholdCode();
-const householdRef = doc(db, "households", HOUSEHOLD);
-
-// ------------------------------------------------------------
-// INITIALIZE the pillbox document if it doesn't exist yet
-// ------------------------------------------------------------
-async function ensurePillboxExists() {
-  const snap = await new Promise((resolve) => {
-    const unsub = onSnapshot(householdRef, (s) => {
-      unsub();
-      resolve(s);
-    });
-  });
-
-  if (!snap.exists()) {
-    const slots = Array.from({ length: TOTAL_PILLS }, (_, i) => ({
-      index: i,
-      taken: false,
-      takenBy: null,
-      takenAt: null,
-    }));
-    await setDoc(householdRef, { slots, totalPills: TOTAL_PILLS });
-  }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: var(--pink-page);
+  color: var(--text-dark);
+  padding-bottom: 40px;
+  -webkit-font-smoothing: antialiased;
 }
 
-// ------------------------------------------------------------
-// REAL-TIME SYNC: this listener fires instantly on BOTH phones
-// whenever either person logs or undoes a pill.
-// ------------------------------------------------------------
-function listenForChanges(onUpdate) {
-  return onSnapshot(householdRef, (snap) => {
-    if (snap.exists()) {
-      onUpdate(snap.data());
-    }
-  });
+/* ---------------------------------------------------------- */
+/* Header                                                      */
+/* ---------------------------------------------------------- */
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 20px;
+  background: linear-gradient(135deg, var(--pink-header), var(--pink-header-dark));
+  color: white;
+  border-radius: 0 0 20px 20px;
+  box-shadow: var(--shadow);
 }
 
-// ------------------------------------------------------------
-// TAKE A PILL — race-condition safe.
-// Uses a Firestore transaction: it re-reads the slot at the
-// moment of writing. If the other person already logged it
-// a split second earlier, this throws and we tell the UI
-// "already taken" instead of silently double-logging.
-// ------------------------------------------------------------
-async function takePill(slotIndex) {
-  try {
-    await runTransaction(db, async (tx) => {
-      const snap = await tx.get(householdRef);
-      const data = snap.data();
-      const slots = [...data.slots];
-
-      if (slots[slotIndex].taken) {
-        throw new Error("ALREADY_TAKEN");
-      }
-
-      slots[slotIndex] = {
-        ...slots[slotIndex],
-        taken: true,
-        takenBy: ME,
-        takenAt: new Date().toISOString(), // stored as ISO so both phones show it identically
-      };
-
-      tx.update(householdRef, { slots });
-    });
-
-    // Fire a push notification to the other person (see notifications.js)
-    notifyOtherPerson(`Pill logged 💊`, `Taken at ${new Date().toLocaleTimeString()}`);
-    return { ok: true };
-  } catch (err) {
-    if (err.message === "ALREADY_TAKEN") {
-      return { ok: false, reason: "already-taken" };
-    }
-    console.error(err);
-    return { ok: false, reason: "error" };
-  }
+.app-header__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-// ------------------------------------------------------------
-// UNDO — puts the slot back to "not taken" so it can be logged
-// again. Either person can undo (matches "cancel the log if we
-// made a mistake").
-// ------------------------------------------------------------
-async function undoPill(slotIndex) {
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(householdRef);
-    const data = snap.data();
-    const slots = [...data.slots];
-
-    slots[slotIndex] = {
-      ...slots[slotIndex],
-      taken: false,
-      takenBy: null,
-      takenAt: null,
-    };
-
-    tx.update(householdRef, { slots });
-  });
-
-  notifyOtherPerson(`Pill log undone`, `Slot ${slotIndex + 1} is available again`);
+.pill-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-// ------------------------------------------------------------
-// NEW PACK — resets every slot back to untaken. Use this once
-// a pack/case is finished and you're starting a fresh one.
-// ------------------------------------------------------------
-async function resetPack() {
-  const slots = Array.from({ length: TOTAL_PILLS }, (_, i) => ({
-    index: i,
-    taken: false,
-    takenBy: null,
-    takenAt: null,
-  }));
-  await setDoc(householdRef, { slots, totalPills: TOTAL_PILLS });
-  notifyOtherPerson(`New pack started 💊`, `All ${TOTAL_PILLS} pills are back online`);
+.pill-icon svg {
+  width: 24px;
+  height: 24px;
 }
 
-// ------------------------------------------------------------
-// PUSH SUBSCRIPTIONS: register this device to receive pushes,
-// store the subscription in Firestore so the *other* person's
-// device can find it and send to it.
-// ------------------------------------------------------------
-async function registerForPush() {
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone =
-    window.matchMedia("(display-mode: standalone)").matches ||
-    window.navigator.standalone === true;
-
-  // iOS only exposes PushManager/Notification permission inside an
-  // installed (Add to Home Screen) app, opened from its own icon —
-  // never inside a regular Safari tab. Detect this specifically so
-  // the UI can tell the person what to do, instead of failing silently.
-  if (isIOS && !isStandalone) {
-    return { ok: false, reason: "ios-not-installed" };
-  }
-
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-    return { ok: false, reason: "unsupported" };
-  }
-
-  const reg = await navigator.serviceWorker.register("./service-worker.js");
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted") {
-    return { ok: false, reason: "permission-denied" };
-  }
-
-  const sub = await reg.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-  });
-
-  // Save this device's subscription under its owner's name,
-  // so the other person can send pushes to it.
-  await setDoc(doc(db, "households", HOUSEHOLD, "subscriptions", ME), {
-    subscription: sub.toJSON(),
-    updatedAt: serverTimestamp(),
-  });
-
-  return { ok: true };
+.app-header h1 {
+  font-size: 21px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: 0.2px;
 }
 
-function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = atob(base64);
-  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+.bell-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: transform 0.15s ease;
+  padding: 0;
 }
 
-// ------------------------------------------------------------
-// UNSUBSCRIBE this device from push (used when muting). Removes
-// the browser-level subscription AND the Firestore record so the
-// other person's device stops trying to send to it.
-// ------------------------------------------------------------
-async function unregisterPush() {
-  if (!("serviceWorker" in navigator)) return;
-  try {
-    const reg = await navigator.serviceWorker.getRegistration("./service-worker.js");
-    const sub = reg && (await reg.pushManager.getSubscription());
-    if (sub) await sub.unsubscribe();
-  } catch (err) {
-    console.warn("Failed to unsubscribe push:", err);
-  }
-  try {
-    await deleteDoc(doc(db, "households", HOUSEHOLD, "subscriptions", ME));
-  } catch (err) {
-    console.warn("Failed to remove subscription doc:", err);
-  }
+.bell-btn:active {
+  transform: scale(0.92);
 }
 
-// ------------------------------------------------------------
-// SEND NOTIFICATION: calls our tiny serverless function
-// (api/send-notification.js) which does the actual Web Push
-// send server-side (browsers can't push directly to each other).
-// ------------------------------------------------------------
-async function notifyOtherPerson(title, body) {
-  try {
-    await fetch("/api/send-notification", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        household: HOUSEHOLD,
-        excludeName: ME, // don't notify yourself
-        title,
-        body,
-      }),
-    });
-  } catch (err) {
-    console.warn("Notification send failed (non-fatal):", err);
-  }
+.bell-icon {
+  width: 20px;
+  height: 20px;
 }
 
-// ------------------------------------------------------------
-// PUBLIC API for your UI code (style.css / your rendering) to use
-// ------------------------------------------------------------
-window.PillTracker = {
-  ME,
-  HOUSEHOLD,
-  TOTAL_PILLS,
-  ensurePillboxExists,
-  listenForChanges,
-  takePill,
-  undoPill,
-  resetPack,
-  registerForPush,
-  unregisterPush,
-};
+.bell-icon--off {
+  display: none;
+}
 
-// Let the classic (non-module) script in index.html know it's safe
-// to read window.PillTracker now — module scripts run after the
-// page has parsed, so anything relying on this can't just run
-// top-level in that script; it has to wait for this event.
-window.dispatchEvent(new CustomEvent("pilltracker-ready"));
+.bell-btn.muted {
+  background: var(--pink-card);
+}
 
-// ------------------------------------------------------------
-// BOOT
-// ------------------------------------------------------------
-(async function boot() {
-  await ensurePillboxExists();
+.bell-btn.muted .bell-icon--on {
+  display: none;
+}
 
-  listenForChanges((data) => {
-    // Call into your rendering function — you control the look.
-    if (typeof window.renderPillbox === "function") {
-      window.renderPillbox(data.slots, { me: ME, takePill, undoPill });
-    }
-  });
+.bell-btn.muted .bell-icon--off {
+  display: block;
+}
 
-  // Ask for notification permission once, ideally after a user tap
-  // (iOS requires a user gesture — see README for the button pattern).
-})();
+.ios-banner {
+  background: #fff0f7;
+  color: var(--pink-header-dark);
+  border-bottom: 1px solid var(--pink-card-border);
+  padding: 10px 20px;
+  font-size: 13px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.save-link-banner {
+  background: #fff0f7;
+  border-bottom: 1px solid var(--pink-card-border);
+  padding: 14px 20px;
+  font-size: 13px;
+  color: var(--text-dark);
+  line-height: 1.4;
+}
+
+.save-link-banner p {
+  margin: 0 0 8px;
+}
+
+.save-link-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+#save-link-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--pink-card-border);
+  background: white;
+  font-size: 12px;
+  color: var(--text-dark);
+}
+
+#save-link-copy {
+  background: var(--pink-header);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.save-link-hint {
+  font-size: 12px;
+  color: #a86685;
+}
+
+.save-link-dismiss {
+  background: none;
+  border: none;
+  color: var(--pink-header-dark);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ---------------------------------------------------------- */
+/* Pillbox card                                                */
+/* ---------------------------------------------------------- */
+
+.pillbox-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 32px 20px 8px;
+}
+
+.pillbox {
+  --columns: 4;
+  display: grid;
+  grid-template-columns: repeat(var(--columns), 1fr);
+  gap: 18px 18px;
+  background: var(--pink-card);
+  border: 1px solid var(--pink-card-border);
+  border-radius: 28px;
+  padding: 28px 26px;
+  max-width: 360px;
+  width: 100%;
+  box-shadow: var(--shadow);
+  position: relative;
+}
+
+/* thin vertical dividers strictly BETWEEN columns (not at the
+   outer edges), like a blister pack — fixed for 4 columns to
+   match COLUMNS in index.html */
+.pillbox::before {
+  content: "";
+  position: absolute;
+  inset: 20px 26px;
+  background-image: linear-gradient(
+    to right,
+    transparent calc(25% - 1px), rgba(255, 255, 255, 0.55) calc(25% - 1px), rgba(255, 255, 255, 0.55) 25%, transparent 25%,
+    transparent calc(50% - 1px), rgba(255, 255, 255, 0.55) calc(50% - 1px), rgba(255, 255, 255, 0.55) 50%, transparent 50%,
+    transparent calc(75% - 1px), rgba(255, 255, 255, 0.55) calc(75% - 1px), rgba(255, 255, 255, 0.55) 75%, transparent 75%
+  );
+  pointer-events: none;
+  border-radius: 12px;
+}
+
+.pill-slot {
+  position: relative;
+  z-index: 1;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease, opacity 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08), inset 0 -2px 3px rgba(0, 0, 0, 0.06);
+}
+
+.pill-slot:active {
+  transform: scale(0.9);
+}
+
+.pill-slot--gray {
+  background: var(--pill-gray);
+}
+
+.pill-slot--white {
+  background: var(--pill-white);
+}
+
+/* Taken = the pill has been "popped out" of the pack, so the
+   slot goes see-through and shows the card color behind it. */
+.pill-slot.taken {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+  opacity: 0.55;
+}
+
+.pill-slot--gray.taken,
+.pill-slot--white.taken {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------- */
+/* Status + controls                                           */
+/* ---------------------------------------------------------- */
+
+.pill-slot.pending {
+  animation: pill-pulse 0.6s ease-in-out infinite;
+  cursor: wait;
+}
+
+@keyframes pill-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* ---------------------------------------------------------- */
+/* Actions                                                      */
+/* ---------------------------------------------------------- */
+
+.actions-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.new-pack-btn {
+  background: white;
+  color: var(--pink-header-dark);
+  border: 1.5px solid var(--pink-card-border);
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(255, 95, 162, 0.15);
+  transition: transform 0.15s ease;
+}
+
+.new-pack-btn:active {
+  transform: scale(0.96);
+}
+
+.new-pack-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.status-line {
+  text-align: center;
+  font-weight: 600;
+  color: var(--pink-header-dark);
+  margin-top: 20px;
+  font-size: 15px;
+}
