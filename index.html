@@ -4,20 +4,20 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Pill Tracker</title>
- 
+
 <!-- PWA install support -->
 <link rel="manifest" href="./manifest.json" />
- 
+
 <!-- iOS "Add to Home Screen" specific tags -->
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Pills" />
 <link rel="apple-touch-icon" href="./icons/icon-192.png" />
- 
+
 <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
- 
+
 <header class="app-header">
   <div class="app-header__title">
     <span class="pill-icon" aria-hidden="true">
@@ -40,7 +40,7 @@
     </svg>
   </button>
 </header>
- 
+
 <!-- This is where the pillbox UI renders. Style/rebuild this freely —
      just keep the data-slot-index attribute and the take/undo click
      handlers wired to window.PillTracker so the logic keeps working. -->
@@ -49,9 +49,13 @@
     <!-- filled in by renderPillbox() -->
   </div>
 </main>
- 
+
 <p class="status-line" id="status-line"></p>
- 
+
+<div class="actions-row">
+  <button id="new-pack-btn" class="new-pack-btn">New pack</button>
+</div>
+
 <script type="module" src="./app.js"></script>
 <script>
   // --------------------------------------------------------
@@ -60,69 +64,110 @@
   // end-to-end while you build the real pink/cute UI.
   // --------------------------------------------------------
   const COLUMNS = 4; // matches the blister-pack layout in the design
- 
+
   window.renderPillbox = function (slots, { me, takePill, undoPill }) {
     const container = document.getElementById("pillbox");
     container.innerHTML = "";
     container.style.setProperty("--columns", COLUMNS);
- 
+
     const remaining = slots.filter((s) => !s.taken).length;
     document.getElementById("status-line").textContent =
       `${remaining} of ${slots.length} pills remaining`;
- 
+
     slots.forEach((slot, i) => {
       const col = i % COLUMNS;
       const el = document.createElement("button");
- 
+
       // First column reads as the "gray" pills, the rest as "white" —
       // this is purely visual (matches the pack mockup) and has no
       // effect on the take/undo logic.
       const shade = col === 0 ? "pill-slot--gray" : "pill-slot--white";
       el.className = `pill-slot ${shade}` + (slot.taken ? " taken" : "");
       el.dataset.slotIndex = i;
- 
+
       if (slot.taken && slot.takenAt) {
         const when = new Date(slot.takenAt).toLocaleString();
         el.title = `Taken by ${slot.takenBy} at ${when}`;
       }
- 
+
       el.addEventListener("click", async () => {
         if (!slot.taken) {
+          // Instant feedback: show it as taken right away instead of
+          // waiting for the round trip to the server. If it turns out
+          // to be a lost race, we revert and let the user know.
+          el.classList.add("taken", "pending");
+          el.disabled = true;
+
           const result = await takePill(i);
-          if (!result.ok && result.reason === "already-taken") {
-            alert("Someone just logged this one a second ago — refreshing.");
+
+          el.disabled = false;
+          el.classList.remove("pending");
+          if (!result.ok) {
+            el.classList.remove("taken");
+            if (result.reason === "already-taken") {
+              alert("Someone just logged this one a second ago — refreshing.");
+            }
           }
         } else {
           const when = slot.takenAt ? new Date(slot.takenAt).toLocaleString() : "";
           if (confirm(`Undo this log by ${slot.takenBy}${when ? ` (${when})` : ""}?`)) {
+            el.classList.remove("taken");
+            el.classList.add("pending");
+            el.disabled = true;
             await undoPill(i);
+            el.disabled = false;
+            el.classList.remove("pending");
           }
         }
       });
- 
+
       container.appendChild(el);
     });
   };
- 
+
   const bellBtn = document.getElementById("enable-notifs");
- 
-  // Reflect any saved mute preference on load.
-  if (localStorage.getItem("pt_muted") === "true") {
-    bellBtn.classList.add("muted");
-    bellBtn.setAttribute("aria-label", "Notifications muted — tap to unmute");
-  }
- 
-  bellBtn.addEventListener("click", async () => {
-    const isMuted = bellBtn.classList.toggle("muted");
-    localStorage.setItem("pt_muted", isMuted);
+
+  // Three real states, tracked explicitly so the very first tap
+  // always means "enable" (this was previously buggy — the first
+  // tap was accidentally muting instead of enabling):
+  //   "unset"   -> never tapped yet (default, shows the plain bell)
+  //   "enabled" -> subscribed to push (plain bell)
+  //   "muted"   -> explicitly muted (bell with a slash)
+  let notifState = localStorage.getItem("pt_notif_state") || "unset";
+
+  function applyBellState() {
+    bellBtn.classList.toggle("muted", notifState === "muted");
     bellBtn.setAttribute(
       "aria-label",
-      isMuted ? "Notifications muted — tap to unmute" : "Enable notifications"
+      notifState === "muted" ? "Notifications muted — tap to enable" : "Enable notifications"
     );
- 
-    if (!isMuted) {
-      // Must be triggered by a user tap (especially required on iOS)
+  }
+  applyBellState();
+
+  bellBtn.addEventListener("click", async () => {
+    if (notifState === "muted") {
+      notifState = "enabled";
+      applyBellState();
       window.PillTracker.registerForPush();
+    } else {
+      notifState = "muted";
+      applyBellState();
+      window.PillTracker.unregisterPush();
+    }
+    localStorage.setItem("pt_notif_state", notifState);
+  });
+
+  // NOTE: we deliberately do NOT call registerForPush() automatically
+  // on load — iOS requires Notification.requestPermission() to be
+  // triggered by a direct user tap, so it only happens inside the
+  // bell button's click handler above.
+
+  const newPackBtn = document.getElementById("new-pack-btn");
+  newPackBtn.addEventListener("click", async () => {
+    if (confirm("Start a new pack? This resets every slot back to untaken for both of you.")) {
+      newPackBtn.disabled = true;
+      await window.PillTracker.resetPack();
+      newPackBtn.disabled = false;
     }
   });
 </script>
