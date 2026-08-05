@@ -18,6 +18,7 @@ import {
   runTransaction,
   setDoc,
   deleteDoc,
+  updateDoc,
   serverTimestamp,
   collection,
   addDoc,
@@ -100,7 +101,15 @@ async function ensurePillboxExists() {
       takenBy: null,
       takenAt: null,
     }));
-    await setDoc(householdRef, { slots, totalPills: TOTAL_PILLS });
+    await setDoc(householdRef, {
+      slots,
+      totalPills: TOTAL_PILLS,
+      water: { pink: 100, black: 100 },
+    });
+  } else if (!snap.data().water) {
+    // Upgrading a household document created before the water
+    // feature existed — add default levels without touching pills.
+    await setDoc(householdRef, { water: { pink: 100, black: 100 } }, { merge: true });
   }
 }
 
@@ -191,8 +200,24 @@ async function resetPack() {
     takenBy: null,
     takenAt: null,
   }));
-  await setDoc(householdRef, { slots, totalPills: TOTAL_PILLS });
+  // merge:true so this only touches pill slots, not water levels
+  await setDoc(householdRef, { slots, totalPills: TOTAL_PILLS }, { merge: true });
   notifyOtherPerson(`New pack started 💊`, `All ${TOTAL_PILLS} pills are back online`);
+}
+
+// ------------------------------------------------------------
+// WATER TRACKER — two independent bottles (pink / black), each
+// 0-100%. Dragging a bottle on one phone writes here, which
+// pushes the update to the other phone via the same onSnapshot
+// listener that already drives the pillbox.
+// ------------------------------------------------------------
+async function setWaterLevel(bottleKey, percent) {
+  const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+  await updateDoc(householdRef, { [`water.${bottleKey}`]: clamped });
+}
+
+async function refillWater(bottleKey) {
+  await setWaterLevel(bottleKey, 100);
 }
 
 // ------------------------------------------------------------
@@ -303,6 +328,8 @@ window.PillTracker = {
   resetPack,
   registerForPush,
   unregisterPush,
+  setWaterLevel,
+  refillWater,
 };
 
 // Let the classic (non-module) script in index.html know it's safe
@@ -321,6 +348,9 @@ window.dispatchEvent(new CustomEvent("pilltracker-ready"));
     // Call into your rendering function — you control the look.
     if (typeof window.renderPillbox === "function") {
       window.renderPillbox(data.slots, { me: ME, takePill, undoPill });
+    }
+    if (typeof window.renderWaterTab === "function") {
+      window.renderWaterTab(data.water);
     }
   });
 
