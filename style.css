@@ -375,7 +375,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  width: 140px;
+  width: 160px;
 }
 
 .water-percent {
@@ -385,8 +385,8 @@ body {
 }
 
 .bottle-svg {
-  width: 140px;
-  height: 280px;
+  width: 155px;
+  height: 151px; /* matches the real bottle image's 390x380 aspect ratio */
   touch-action: none;
   cursor: grab;
   user-select: none;
@@ -398,24 +398,6 @@ body {
 
 .water-fill {
   transition: none;
-}
-
-.bottle-outline rect,
-.bottle-outline path {
-  fill: none;
-  stroke-width: 7;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-
-.bottle-outline--pink rect,
-.bottle-outline--pink path {
-  stroke: #ff5fa2;
-}
-
-.bottle-outline--black rect,
-.bottle-outline--black path {
-  stroke: #33333a;
 }
 
 .refill-btn {
