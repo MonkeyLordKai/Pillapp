@@ -6,17 +6,17 @@
 // 2) Basic offline caching so it feels like a native app.
 // ============================================================
 
-const CACHE_NAME = "pill-tracker-v2";
+const CACHE_NAME = "pill-tracker-v3";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
   "./manifest.json",
-  "./water-bottle-pink-line.png",
-  "./water-bottle-pink-silhouette.png",
-  "./water-bottle-black-line.png",
-  "./water-bottle-black-silhouette.png",
+  "./pink-bottle-line.png",
+  "./pink-bottle-silhouette.png",
+  "./black-bottle-line.png",
+  "./black-bottle-silhouette.png",
 ];
 
 self.addEventListener("install", (event) => {
