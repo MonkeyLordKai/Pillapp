@@ -13,10 +13,10 @@ const CORE_ASSETS = [
   "./style.css",
   "./app.js",
   "./manifest.json",
-  "./icons/water/pink-bottle-line.png",
-  "./icons/water/pink-bottle-silhouette.png",
-  "./icons/water/black-bottle-line.png",
-  "./icons/water/black-bottle-silhouette.png",
+  "./water-bottle-pink-line.png",
+  "./water-bottle-pink-silhouette.png",
+  "./water-bottle-black-line.png",
+  "./water-bottle-black-silhouette.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -53,8 +53,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: "./icons/icon-192.png",
-      badge: "./icons/icon-192.png",
+      icon: "./icon-192.png",
+      badge: "./icon-192.png",
       tag: "pill-tracker-update", // replaces older notifications instead of stacking
     })
   );
