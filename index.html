@@ -42,33 +42,120 @@
 </header>
 
 <div id="ios-banner" class="ios-banner" hidden>
-  📲 Hi bebe to add this to ur homescreen — tap <strong>Share → Add to Home Screen</strong>.
+  📲 On iPhone, notifications only work once you add this to your Home Screen and open it from there — tap <strong>Share → Add to Home Screen</strong>.
 </div>
 
 <div id="save-link-banner" class="save-link-banner" hidden>
-  <p>💾 Save this link and copy and paste it into safari then add it to ur home screen:</p>
+  <p>💾 Save this exact link so this device never forgets your household code, even if iPhone clears its storage:</p>
   <div class="save-link-row">
     <input id="save-link-input" type="text" readonly />
     <button id="save-link-copy">Copy</button>
   </div>
-  <p class="save-link-hint">Paste it into Safari's address bar and open it once.</p>
-  <button id="save-link-dismiss" class="save-link-dismiss">Hide this</button>
+  <p class="save-link-hint">Paste it into Safari's address bar and open it once, or bookmark it — that's it, nothing to type.</p>
+  <button id="save-link-dismiss" class="save-link-dismiss">Got it, hide this</button>
 </div>
 
-<!-- This is where the pillbox UI renders. Style/rebuild this freely —
-     just keep the data-slot-index attribute and the take/undo click
-     handlers wired to window.PillTracker so the logic keeps working. -->
-<main class="pillbox-wrap">
-  <div id="pillbox" class="pillbox">
-    <!-- filled in by renderPillbox() -->
-  </div>
+<!-- shared SVG defs used by both water bottles -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="water-gradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8fe0ff" />
+      <stop offset="100%" stop-color="#2fb2f0" />
+    </linearGradient>
+  </defs>
+</svg>
+
+<main>
+  <!-- ============================== PILLS PAGE ============================== -->
+  <section id="page-pills" class="page">
+    <!-- This is where the pillbox UI renders. Style/rebuild this freely —
+         just keep the data-slot-index attribute and the take/undo click
+         handlers wired to window.PillTracker so the logic keeps working. -->
+    <div class="pillbox-wrap">
+      <div id="pillbox" class="pillbox">
+        <!-- filled in by renderPillbox() -->
+      </div>
+    </div>
+
+    <p class="status-line" id="status-line"></p>
+
+    <div class="actions-row">
+      <button id="new-pack-btn" class="new-pack-btn">New pack</button>
+    </div>
+  </section>
+
+  <!-- ============================== WATER PAGE ============================== -->
+  <section id="page-water" class="page" hidden>
+    <div class="water-row">
+
+      <div class="water-bottle" data-bottle="pink">
+        <div class="water-percent" id="water-percent-pink">100%</div>
+        <svg id="bottle-svg-pink" class="bottle-svg" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="clip-pink">
+              <path d="M70,40 L130,40 L145,95 Q150,112 128,115 L72,115 Q50,112 55,95 Z" />
+              <rect x="30" y="115" width="140" height="250" rx="30" ry="30" />
+              <rect x="25" y="330" width="150" height="45" rx="20" ry="20" />
+            </clipPath>
+          </defs>
+          <g clip-path="url(#clip-pink)">
+            <rect id="fill-pink" class="water-fill" x="0" y="380" width="200" height="400" fill="url(#water-gradient)" />
+          </g>
+          <g class="bottle-outline bottle-outline--pink">
+            <rect class="cap" x="80" y="10" width="40" height="30" rx="6" />
+            <path class="neck" d="M70,40 L130,40 L145,95 Q150,112 128,115 L72,115 Q50,112 55,95 Z" />
+            <rect class="body" x="30" y="115" width="140" height="250" rx="30" ry="30" />
+            <rect class="grip" x="128" y="160" width="18" height="90" rx="9" />
+            <rect class="base" x="25" y="330" width="150" height="45" rx="20" ry="20" />
+          </g>
+        </svg>
+        <button class="refill-btn refill-btn--pink" data-bottle="pink">Refill</button>
+      </div>
+
+      <div class="water-bottle" data-bottle="black">
+        <div class="water-percent" id="water-percent-black">100%</div>
+        <svg id="bottle-svg-black" class="bottle-svg" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="clip-black">
+              <path d="M70,40 L130,40 L145,95 Q150,112 128,115 L72,115 Q50,112 55,95 Z" />
+              <rect x="30" y="115" width="140" height="250" rx="30" ry="30" />
+              <rect x="25" y="330" width="150" height="45" rx="20" ry="20" />
+            </clipPath>
+          </defs>
+          <g clip-path="url(#clip-black)">
+            <rect id="fill-black" class="water-fill" x="0" y="380" width="200" height="400" fill="url(#water-gradient)" />
+          </g>
+          <g class="bottle-outline bottle-outline--black">
+            <rect class="cap" x="80" y="10" width="40" height="30" rx="6" />
+            <path class="neck" d="M70,40 L130,40 L145,95 Q150,112 128,115 L72,115 Q50,112 55,95 Z" />
+            <rect class="body" x="30" y="115" width="140" height="250" rx="30" ry="30" />
+            <rect class="grip" x="128" y="160" width="18" height="90" rx="9" />
+            <rect class="base" x="25" y="330" width="150" height="45" rx="20" ry="20" />
+          </g>
+        </svg>
+        <button class="refill-btn refill-btn--black" data-bottle="black">Refill</button>
+      </div>
+
+    </div>
+    <p class="water-hint">Drag up/down on a bottle to set its level — it syncs to both phones.</p>
+  </section>
 </main>
 
-<p class="status-line" id="status-line"></p>
-
-<div class="actions-row">
-  <button id="new-pack-btn" class="new-pack-btn">New pack</button>
-</div>
+<nav class="tab-bar">
+  <button class="tab-btn active" id="tab-pills" data-page="pills" aria-label="Pills">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4.93 19.07a5 5 0 0 0 7.07 0l7.07-7.07a5 5 0 0 0-7.07-7.07l-7.07 7.07a5 5 0 0 0 0 7.07Z" stroke="currentColor" stroke-width="1.8"/>
+      <path d="M8.46 8.46 15.54 15.54" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+    <span>Pills</span>
+  </button>
+  <button class="tab-btn" id="tab-water" data-page="water" aria-label="Water">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2.5c3 4 7 8.2 7 12.2a7 7 0 1 1-14 0c0-4 4-8.2 7-12.2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+    </svg>
+    <span>Water</span>
+  </button>
+</nav>
 
 <script type="module" src="./app.js"></script>
 <script>
@@ -200,6 +287,109 @@
   // on load — iOS requires Notification.requestPermission() to be
   // triggered by a direct user tap, so it only happens inside the
   // bell button's click handler above.
+
+  // ------------------------------------------------------------
+  // Tab bar: switches between the Pills page and the Water page.
+  // ------------------------------------------------------------
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".page").forEach((p) => (p.hidden = true));
+      btn.classList.add("active");
+      document.getElementById(`page-${btn.dataset.page}`).hidden = false;
+    });
+  });
+
+  // ------------------------------------------------------------
+  // Water bottles: draggable fill level, synced through Firestore.
+  //
+  // The bottle is an SVG clipped to a jug silhouette; a rect inside
+  // the clip rises/falls to show the fill level. FILL_TOP/FILL_BOTTOM
+  // are the SVG y-coordinates that count as 100%/0% inside the
+  // 200x400 viewBox.
+  // ------------------------------------------------------------
+  const FILL_TOP = 115;
+  const FILL_BOTTOM = 380;
+
+  const waterDragState = { pink: false, black: false };
+
+  function applyWaterVisual(bottleKey, percent) {
+    const clamped = Math.max(0, Math.min(100, percent));
+    const fillY = FILL_BOTTOM - (clamped / 100) * (FILL_BOTTOM - FILL_TOP);
+    const fillRect = document.getElementById(`fill-${bottleKey}`);
+    const label = document.getElementById(`water-percent-${bottleKey}`);
+    fillRect.setAttribute("y", fillY);
+    fillRect.setAttribute("height", 400 - fillY);
+    label.textContent = `${Math.round(clamped)}%`;
+    return clamped;
+  }
+
+  function pointerToPercent(evt, svgEl) {
+    const rect = svgEl.getBoundingClientRect();
+    const relY = (evt.clientY - rect.top) / rect.height;
+    const viewBoxY = relY * 400;
+    const clampedY = Math.min(FILL_BOTTOM, Math.max(FILL_TOP, viewBoxY));
+    return 100 - ((clampedY - FILL_TOP) / (FILL_BOTTOM - FILL_TOP)) * 100;
+  }
+
+  function setupBottleDrag(bottleKey) {
+    const svg = document.getElementById(`bottle-svg-${bottleKey}`);
+    let dragging = false;
+
+    svg.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      waterDragState[bottleKey] = true;
+      svg.setPointerCapture(e.pointerId);
+      applyWaterVisual(bottleKey, pointerToPercent(e, svg));
+    });
+
+    svg.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      applyWaterVisual(bottleKey, pointerToPercent(e, svg));
+    });
+
+    svg.addEventListener("pointerup", async (e) => {
+      if (!dragging) return;
+      dragging = false;
+      const finalPercent = applyWaterVisual(bottleKey, pointerToPercent(e, svg));
+      waterDragState[bottleKey] = false;
+      if (window.PillTracker) {
+        await window.PillTracker.setWaterLevel(bottleKey, Math.round(finalPercent));
+      }
+    });
+
+    svg.addEventListener("pointercancel", () => {
+      dragging = false;
+      waterDragState[bottleKey] = false;
+    });
+  }
+
+  setupBottleDrag("pink");
+  setupBottleDrag("black");
+
+  document.querySelectorAll(".refill-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const key = btn.dataset.bottle;
+      btn.disabled = true;
+      applyWaterVisual(key, 100);
+      if (window.PillTracker) {
+        await window.PillTracker.refillWater(key);
+      }
+      btn.disabled = false;
+    });
+  });
+
+  // Called by app.js whenever fresh data (including water levels)
+  // arrives from Firestore — keeps both phones in sync. Skips a
+  // bottle currently mid-drag so we don't fight the person's finger.
+  window.renderWaterTab = function (water) {
+    const data = water || { pink: 100, black: 100 };
+    ["pink", "black"].forEach((key) => {
+      if (waterDragState[key]) return;
+      const percent = typeof data[key] === "number" ? data[key] : 100;
+      applyWaterVisual(key, percent);
+    });
+  };
 
   const newPackBtn = document.getElementById("new-pack-btn");
   newPackBtn.addEventListener("click", async () => {
