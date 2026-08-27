@@ -6,7 +6,7 @@
 // 2) Basic offline caching so it feels like a native app.
 // ============================================================
 
-const CACHE_NAME = "pill-tracker-v3";
+const CACHE_NAME = "pill-tracker-v4";
 const CORE_ASSETS = [
   "./",
   "./index.html",
