@@ -23,8 +23,19 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   background: var(--pink-page);
   color: var(--text-dark);
-  padding-bottom: 40px;
   -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+}
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 /* ---------------------------------------------------------- */
@@ -313,10 +324,6 @@ body {
    Nav bar (bottom tabs)
    ============================================================ */
 
-body {
-  padding-bottom: calc(72px + env(safe-area-inset-bottom));
-}
-
 .tab-bar {
   position: fixed;
   bottom: 0;
@@ -341,13 +348,13 @@ body {
   color: #c9a5b8;
   cursor: pointer;
   padding: 4px 0;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
 }
 
 .tab-btn svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
 }
 
 .tab-btn.active {
@@ -358,15 +365,35 @@ body {
    Water page
    ============================================================ */
 
+/* ============================================================
+   Page layout — each page fills the space between the header
+   and the tab bar; the water/empty pages center their content
+   vertically instead of hugging the top (fixes "too much white
+   space below the bottles").
+   ============================================================ */
+
 .page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   padding-top: 8px;
+}
+
+.page[hidden] {
+  display: none;
+}
+
+#page-water {
+  justify-content: center;
+  align-items: center;
 }
 
 .water-row {
   display: flex;
   justify-content: center;
-  gap: 28px;
-  padding: 32px 20px 8px;
+  align-items: flex-start;
+  gap: 6vw;
+  padding: 12px 20px;
   flex-wrap: wrap;
 }
 
@@ -375,18 +402,18 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  width: 160px;
 }
 
 .water-percent {
   font-weight: 800;
-  font-size: 18px;
+  font-size: 22px;
   color: var(--pink-header-dark);
 }
 
 .bottle-svg {
-  width: 155px;
-  height: 151px; /* matches the real bottle image's 390x380 aspect ratio */
+  width: min(38vw, 220px);
+  aspect-ratio: 390 / 380;
+  height: auto;
   touch-action: none;
   cursor: grab;
   user-select: none;
@@ -400,12 +427,19 @@ body {
   transition: none;
 }
 
+.water-stats {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a86685;
+  text-align: center;
+}
+
 .refill-btn {
   border: none;
   border-radius: 999px;
-  padding: 8px 20px;
+  padding: 10px 24px;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
   color: white;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
@@ -429,5 +463,36 @@ body {
   font-size: 12px;
   color: #a86685;
   padding: 0 30px;
-  margin-top: 18px;
+  margin-top: 22px;
+}
+
+/* ============================================================
+   Empty-state pages (Gym, Money — placeholders)
+   ============================================================ */
+
+.page--empty {
+  justify-content: center;
+  align-items: center;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 0 30px;
+}
+
+.empty-state__icon {
+  font-size: 52px;
+  margin-bottom: 12px;
+}
+
+.empty-state h2 {
+  margin: 0 0 6px;
+  color: var(--pink-header-dark);
+  font-size: 20px;
+}
+
+.empty-state p {
+  margin: 0;
+  color: #a86685;
+  font-size: 14px;
 }
