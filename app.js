@@ -22,7 +22,15 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const TOTAL_PILLS = 28;
-const DEFAULT_WATER = { pink: 100, black: 100 };
+// Your bottles are 1-gallon jugs — 1 US gallon = 3.785 liters. Change
+// this if yours are a different size.
+const BOTTLE_CAPACITY_LITERS = 3.785;
+const DEFAULT_WATER = {
+  pink: 100,
+  black: 100,
+  refillCount: { pink: 0, black: 0 },
+  litersDrunk: { pink: 0, black: 0 },
+};
 
 // ------------------------------------------------------------
 // IDENTITY: name + shared household code.
@@ -81,8 +89,22 @@ async function ensurePillboxExists() {
       takenAt: null,
     }));
     await setDoc(householdRef, { slots, totalPills: TOTAL_PILLS, water: DEFAULT_WATER });
-  } else if (!snap.data().water) {
-    await updateDoc(householdRef, { water: DEFAULT_WATER });
+    return;
+  }
+
+  // Backfill any water fields that predate a feature (existing
+  // households keep their current pink/black levels — only missing
+  // pieces get added).
+  const water = snap.data().water;
+  const patch = {};
+  if (!water) {
+    patch.water = DEFAULT_WATER;
+  } else {
+    if (!water.refillCount) patch["water.refillCount"] = { pink: 0, black: 0 };
+    if (!water.litersDrunk) patch["water.litersDrunk"] = { pink: 0, black: 0 };
+  }
+  if (Object.keys(patch).length > 0) {
+    await updateDoc(householdRef, patch);
   }
 }
 
@@ -169,15 +191,43 @@ async function resetPack() {
 }
 
 // ------------------------------------------------------------
-// WATER LEVELS — synced the same way as pills.
+// WATER LEVELS — synced the same way as pills. Any DECREASE in
+// level is treated as water actually being drunk and added to
+// that bottle's running liters-drunk total (an increase — i.e.
+// someone dragging it back up, not a refill — is not counted).
 // ------------------------------------------------------------
 async function setWaterLevel(bottleKey, percent) {
   const clamped = Math.max(0, Math.min(100, Math.round(percent)));
-  await updateDoc(householdRef, { [`water.${bottleKey}`]: clamped });
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(householdRef);
+    const data = snap.data() || {};
+    const water = data.water || DEFAULT_WATER;
+    const oldPercent = typeof water[bottleKey] === "number" ? water[bottleKey] : 100;
+
+    const updates = { [`water.${bottleKey}`]: clamped };
+
+    if (clamped < oldPercent) {
+      const litersDrunkNow = ((oldPercent - clamped) / 100) * BOTTLE_CAPACITY_LITERS;
+      const prevTotal = (water.litersDrunk && water.litersDrunk[bottleKey]) || 0;
+      updates[`water.litersDrunk.${bottleKey}`] = prevTotal + litersDrunkNow;
+    }
+
+    tx.update(householdRef, updates);
+  });
 }
 
 async function refillWater(bottleKey) {
-  await setWaterLevel(bottleKey, 100);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(householdRef);
+    const data = snap.data() || {};
+    const water = data.water || DEFAULT_WATER;
+    const prevCount = (water.refillCount && water.refillCount[bottleKey]) || 0;
+
+    tx.update(householdRef, {
+      [`water.${bottleKey}`]: 100,
+      [`water.refillCount.${bottleKey}`]: prevCount + 1,
+    });
+  });
   notifyOtherPerson(`${ME} refilled the ${bottleKey} bottle`, `Back to 100%`);
 }
 
