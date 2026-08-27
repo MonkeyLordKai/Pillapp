@@ -103,6 +103,7 @@
           <rect id="fill-pink" class="water-fill" x="0" y="380" width="390" height="380" fill="url(#water-gradient)" mask="url(#mask-pink)" />
           <image href="./pink-bottle-line.png" xlink:href="./pink-bottle-line.png" x="0" y="0" width="390" height="380" />
         </svg>
+        <div class="water-stats" id="water-stats-pink">0 refills · 0.0L drunk</div>
         <button class="refill-btn refill-btn--pink" data-bottle="pink">Refill</button>
       </div>
 
@@ -117,11 +118,30 @@
           <rect id="fill-black" class="water-fill" x="0" y="380" width="390" height="380" fill="url(#water-gradient)" mask="url(#mask-black)" />
           <image href="./black-bottle-line.png" xlink:href="./black-bottle-line.png" x="0" y="0" width="390" height="380" />
         </svg>
+        <div class="water-stats" id="water-stats-black">0 refills · 0.0L drunk</div>
         <button class="refill-btn refill-btn--black" data-bottle="black">Refill</button>
       </div>
 
     </div>
     <p class="water-hint">Drag up/down on a bottle to set its level — it syncs to both phones.</p>
+  </section>
+
+  <!-- ============================== GYM PAGE (placeholder) ============================== -->
+  <section id="page-gym" class="page page--empty" hidden>
+    <div class="empty-state">
+      <div class="empty-state__icon">🏋️</div>
+      <h2>Gym</h2>
+      <p>Workout tracking is coming soon.</p>
+    </div>
+  </section>
+
+  <!-- ============================== MONEY PAGE (placeholder) ============================== -->
+  <section id="page-money" class="page page--empty" hidden>
+    <div class="empty-state">
+      <div class="empty-state__icon">💸</div>
+      <h2>Money</h2>
+      <p>Spending tracking is coming soon.</p>
+    </div>
   </section>
 </main>
 
@@ -138,6 +158,23 @@
       <path d="M12 2.5c3 4 7 8.2 7 12.2a7 7 0 1 1-14 0c0-4 4-8.2 7-12.2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
     </svg>
     <span>Water</span>
+  </button>
+  <button class="tab-btn" id="tab-gym" data-page="gym" aria-label="Gym">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 10.5h2v3H2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M20 10.5h2v3h-2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M4.5 8.5v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M19.5 8.5v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M4.5 12h15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+    <span>Gym</span>
+  </button>
+  <button class="tab-btn" id="tab-money" data-page="money" aria-label="Money">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>
+      <path d="M12 7v10M15 9.4c0-1.3-1.3-2.4-3-2.4s-3 .9-3 2.1c0 1.2 1.2 1.6 3 2 1.8.4 3 .8 3 2 0 1.2-1.3 2.1-3 2.1s-3-1-3-2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <span>Money</span>
   </button>
 </nav>
 
@@ -294,7 +331,7 @@
   // ------------------------------------------------------------
   const VIEW_W = 390;
   const VIEW_H = 380;
-  const FILL_TOP = 111; // roughly where the shoulder meets the body — "full"
+  const FILL_TOP = 66; // just below the cap threads, so "full" fills the whole neck
   const FILL_BOTTOM = 380; // at/below the bottom of the bottle — "empty"
 
   const waterDragState = { pink: false, black: false };
@@ -400,9 +437,17 @@
   window.renderWaterTab = function (water) {
     const data = water || { pink: 100, black: 100 };
     ["pink", "black"].forEach((key) => {
-      if (waterDragState[key]) return;
-      const percent = typeof data[key] === "number" ? data[key] : 100;
-      applyWaterVisual(key, percent);
+      if (!waterDragState[key]) {
+        const percent = typeof data[key] === "number" ? data[key] : 100;
+        applyWaterVisual(key, percent);
+      }
+
+      const refills = (data.refillCount && data.refillCount[key]) || 0;
+      const litersDrunk = (data.litersDrunk && data.litersDrunk[key]) || 0;
+      const statsEl = document.getElementById(`water-stats-${key}`);
+      if (statsEl) {
+        statsEl.textContent = `${refills} refill${refills === 1 ? "" : "s"} · ${litersDrunk.toFixed(1)}L drunk`;
+      }
     });
   };
 
